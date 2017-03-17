@@ -57,7 +57,6 @@ class AbstractWorkerExecutorIntegrationTest extends AbstractIntegrationSpec {
             import javax.inject.Inject
             import org.gradle.other.Foo
 
-            @ParallelizableTask
             class WorkerTask extends DefaultTask {
                 def list = $list
                 def outputFileDirPath = "${outputFileDirPath}/\${name}"
