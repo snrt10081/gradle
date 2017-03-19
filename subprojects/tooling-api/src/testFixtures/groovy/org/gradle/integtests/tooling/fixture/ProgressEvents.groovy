@@ -75,7 +75,7 @@ class ProgressEvents implements ProgressListener {
 
                     // Display name should be mostly unique
                     if (!skipValidation && uniqueBuildOperation(descriptor)) {
-                        if (descriptor.displayName in ['Configure settings', 'Configure build', 'Calculate task graph', 'Run tasks']) {
+                        if (descriptor.displayName in ['Run build', 'Configure settings', 'Configure build', 'Calculate task graph', 'Run tasks']) {
                             // Ignore this for now
                         } else {
                             def duplicateName = operations.find({ it.descriptor.displayName == descriptor.displayName })
