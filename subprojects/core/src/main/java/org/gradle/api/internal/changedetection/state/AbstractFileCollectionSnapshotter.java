@@ -36,6 +36,7 @@ import org.gradle.internal.nativeintegration.filesystem.FileSystem;
 import org.gradle.internal.serialize.SerializerRegistry;
 
 import java.io.File;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -65,13 +66,21 @@ public abstract class AbstractFileCollectionSnapshotter implements FileCollectio
 
     @Override
     public FileCollectionSnapshot snapshot(FileCollection input, TaskFilePropertyCompareStrategy compareStrategy, final SnapshotNormalizationStrategy snapshotNormalizationStrategy) {
+        final List<List<FileDetails>> rootFileTreeElements = Lists.newLinkedList();
         final List<FileDetails> fileTreeElements = Lists.newLinkedList();
         FileCollectionInternal fileCollection = (FileCollectionInternal) input;
-        FileCollectionVisitorImpl visitor = new FileCollectionVisitorImpl(fileTreeElements);
+        RootFileCollectionVisitorImpl visitor = new RootFileCollectionVisitorImpl(rootFileTreeElements);
         fileCollection.visitRootElements(visitor);
 
-        if (fileTreeElements.isEmpty()) {
+        if (rootFileTreeElements.isEmpty()) {
             return FileCollectionSnapshot.EMPTY;
+        }
+
+        for (List<FileDetails> rootFileTreeElement : rootFileTreeElements) {
+            rootFileTreeElement = normaliseTreeElements(rootFileTreeElement);
+            for (FileDetails fileDetails : rootFileTreeElement) {
+                fileTreeElements.add(normaliseFileElement(fileDetails));
+            }
         }
 
         Map<String, NormalizedFileSnapshot> snapshots = Maps.newLinkedHashMap();
@@ -121,11 +130,12 @@ public abstract class AbstractFileCollectionSnapshotter implements FileCollectio
         return details;
     }
 
-    private class FileCollectionVisitorImpl implements FileCollectionVisitor {
-        private final List<FileDetails> fileTreeElements;
+    private class RootFileCollectionVisitorImpl implements FileCollectionVisitor {
 
-        FileCollectionVisitorImpl(List<FileDetails> fileTreeElements) {
-            this.fileTreeElements = fileTreeElements;
+        private final List<List<FileDetails>> rootFileTrees;
+
+        private RootFileCollectionVisitorImpl(List<List<FileDetails>> rootFileTrees) {
+            this.rootFileTrees = rootFileTrees;
         }
 
         @Override
@@ -138,14 +148,12 @@ public abstract class AbstractFileCollectionSnapshotter implements FileCollectio
                 }
                 switch (details.getType()) {
                     case Missing:
-                        fileTreeElements.add(details);
+                        rootFileTrees.add(Collections.singletonList(details));
                         break;
                     case RegularFile:
-                        fileTreeElements.add(normaliseFileElement(details));
+                        rootFileTrees.add(Collections.singletonList(details));
                         break;
                     case Directory:
-                        // Visit the directory itself, then its contents
-                        fileTreeElements.add(details);
                         visitDirectoryTree(directoryFileTreeFactory.create(file));
                         break;
                     default:
@@ -154,27 +162,11 @@ public abstract class AbstractFileCollectionSnapshotter implements FileCollectio
             }
         }
 
-        private DefaultFileDetails calculateDetails(File file) {
-            String path = getPath(file);
-            FileMetadataSnapshot stat = fileSystem.stat(file);
-            switch (stat.getType()) {
-                case Missing:
-                    return new DefaultFileDetails(path, new RelativePath(true, file.getName()), Missing, true, missingFileSnapshot());
-                case Directory:
-                    return new DefaultFileDetails(path, new RelativePath(false, file.getName()), Directory, true, dirSnapshot());
-                case RegularFile:
-                    return new DefaultFileDetails(path, new RelativePath(true, file.getName()), RegularFile, true, fileSnapshot(file, stat));
-                default:
-                    throw new IllegalArgumentException("Unrecognized file type: " + stat.getType());
-            }
-        }
-
         @Override
         public void visitTree(FileTreeInternal fileTree) {
             List<FileDetails> elements = Lists.newArrayList();
             fileTree.visitTreeOrBackingFile(new FileVisitorImpl(elements));
-            elements = normaliseTreeElements(elements);
-            fileTreeElements.addAll(elements);
+            rootFileTrees.add(elements);
         }
 
         @Override
@@ -199,8 +191,21 @@ public abstract class AbstractFileCollectionSnapshotter implements FileCollectio
                 }
             }
 
-            elements = normaliseTreeElements(elements);
-            fileTreeElements.addAll(elements);
+            rootFileTrees.add(elements);
+        }
+        private DefaultFileDetails calculateDetails(File file) {
+            String path = getPath(file);
+            FileMetadataSnapshot stat = fileSystem.stat(file);
+            switch (stat.getType()) {
+                case Missing:
+                    return new DefaultFileDetails(path, new RelativePath(true, file.getName()), Missing, true, missingFileSnapshot());
+                case Directory:
+                    return new DefaultFileDetails(path, new RelativePath(false, file.getName()), Directory, true, dirSnapshot());
+                case RegularFile:
+                    return new DefaultFileDetails(path, new RelativePath(true, file.getName()), RegularFile, true, fileSnapshot(file, stat));
+                default:
+                    throw new IllegalArgumentException("Unrecognized file type: " + stat.getType());
+            }
         }
     }
 

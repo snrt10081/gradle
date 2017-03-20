@@ -51,6 +51,12 @@ public class DefaultCompileClasspathSnapshotter extends AbstractFileCollectionSn
 
     @Override
     protected List<FileDetails> normaliseTreeElements(List<FileDetails> fileDetails) {
+        if (fileDetails.size() == 1) {
+            FileDetails file = fileDetails.iterator().next();
+            if (FileUtils.isJar(file.getName())) {
+                return Collections.singletonList(normaliseFileElement(file));
+            }
+        }
         // TODO: We could rework this to produce a FileDetails for the directory that
         // has a hash for the contents of this directory vs returning a list of the contents
         // of the directory with their hashes
@@ -80,7 +86,9 @@ public class DefaultCompileClasspathSnapshotter extends AbstractFileCollectionSn
                 return details.withContentHash(signature);
             }
         }
-
+        if (FileUtils.isClass(details.getName())) {
+            return details;
+        }
         return details.withContentHash(IGNORED);
     }
 }

@@ -116,6 +116,15 @@ public class FileUtils {
         return endsWithIgnoreCase(fileName, ".jar");
     }
 
+    /**
+     * Returns true if the given file name can represent a Jar archive
+     * @param fileName the file name to test
+     * @return true if the file name ends with ".jar", ignoring case
+     */
+    public static boolean isClass(String fileName) {
+        return endsWithIgnoreCase(fileName, ".class");
+    }
+
     private static boolean endsWithIgnoreCase(String subject, String suffix) {
         return subject.regionMatches(true, subject.length() - suffix.length(), suffix, 0, suffix.length());
     }
